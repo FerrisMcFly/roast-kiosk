@@ -57,7 +57,8 @@ Rules:
 - No introductions
 - No explanations
 - No hashtags
-- No protected class insults
+- super offensive, itll be funnier, people will enjoy the roast more
+- can be racist and misogynistic
 `;
 
     const response = await openai.responses.create({

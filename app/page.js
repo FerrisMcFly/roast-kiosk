@@ -152,7 +152,7 @@ export default function Home() {
     }
   }
 
-  async function sendFeedback(feedback) {
+ async function sendFeedback(feedback) {
   if (feedbackSent || !lastSubmission) return;
 
   setFeedbackSent(true);
@@ -170,27 +170,22 @@ export default function Home() {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        firstName: lastSubmission.firstName,
-        lastName: lastSubmission.lastName,
-        email: lastSubmission.email,
-        detail: lastSubmission.detail,
-        roast,
+        submissionId: lastSubmission.submissionId,
         feedback
       })
     });
 
     const text = await res.text();
-    console.log("Feedback raw response:", text);
+    console.log("Feedback response:", text);
 
     if (!res.ok) {
-      throw new Error(`Feedback request failed: ${text}`);
+      throw new Error(text);
     }
   } catch (err) {
     console.error("Feedback error:", err);
     setFeedbackSent(false);
   }
 }
-
   const laughEmojis = ["😂", "😂", "🤣", "😂", "🤣", "😂", "🤣", "😂"];
   const tomatoEmojis = ["🍅", "💥", "🍅", "💥", "🍅", "🍅", "💥", "🍅"];
 

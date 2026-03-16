@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import crypto from "crypto";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -30,7 +31,6 @@ export async function POST(req) {
     }
 
     if (!process.env.OPENAI_API_KEY) {
-      console.error("Missing OPENAI_API_KEY");
       return Response.json(
         { error: "Missing OPENAI_API_KEY" },
         { status: 500 }
@@ -69,41 +69,41 @@ Rules:
       response.output_text?.trim() ||
       `${firstName} somehow gave us less than nothing.`;
 
+    const submissionId = crypto.randomUUID();
+
     if (process.env.GOOGLE_SHEETS_WEBHOOK_URL) {
       try {
-        const sheetRes = await fetch(process.env.GOOGLE_SHEETS_WEBHOOK_URL, {
+        await fetch(process.env.GOOGLE_SHEETS_WEBHOOK_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
+            action: "create",
+            submissionId,
             firstName,
             lastName,
             email,
             detail,
-            roast,
-            feedback: ""
+            roast
           })
         });
-
-        const sheetText = await sheetRes.text();
-        console.log("Google Sheets response:", sheetRes.status, sheetText);
       } catch (sheetError) {
         console.error("Google Sheets error:", sheetError);
       }
-    } else {
-      console.warn("Missing GOOGLE_SHEETS_WEBHOOK_URL");
     }
 
     return Response.json({
       roast,
       submission: {
+        submissionId,
         firstName,
         lastName,
         email,
         detail
       }
     });
+
   } catch (error) {
     console.error("ROAST API ERROR:", error);
 

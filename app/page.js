@@ -63,7 +63,7 @@ export default function Home() {
     if (step === "result") {
       timer = setTimeout(() => {
         resetKiosk();
-      }, 10000);
+      }, 7000);
     }
 
     return () => clearTimeout(timer);
@@ -153,42 +153,43 @@ export default function Home() {
   }
 
   async function sendFeedback(feedback) {
-    if (feedbackSent || !lastSubmission) return;
+  if (feedbackSent || !lastSubmission) return;
 
-    setFeedbackSent(true);
-    setReactionType(feedback);
-    setShowReaction(true);
+  setFeedbackSent(true);
+  setReactionType(feedback);
+  setShowReaction(true);
 
-    setTimeout(() => {
-      setShowReaction(false);
-    }, 1400);
+  setTimeout(() => {
+    setShowReaction(false);
+  }, 1400);
 
-    const feedbackWebhook = process.env.NEXT_PUBLIC_FEEDBACK_WEBHOOK_URL;
+  try {
+    const res = await fetch("/api/feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        firstName: lastSubmission.firstName,
+        lastName: lastSubmission.lastName,
+        email: lastSubmission.email,
+        detail: lastSubmission.detail,
+        roast,
+        feedback
+      })
+    });
 
-    if (!feedbackWebhook) {
-      console.warn("Missing NEXT_PUBLIC_FEEDBACK_WEBHOOK_URL");
-      return;
+    const text = await res.text();
+    console.log("Feedback raw response:", text);
+
+    if (!res.ok) {
+      throw new Error(`Feedback request failed: ${text}`);
     }
-
-    try {
-      await fetch(feedbackWebhook, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          firstName: lastSubmission.firstName,
-          lastName: lastSubmission.lastName,
-          email: lastSubmission.email,
-          detail: lastSubmission.detail,
-          roast,
-          feedback
-        })
-      });
-    } catch (err) {
-      console.error("Feedback error:", err);
-    }
+  } catch (err) {
+    console.error("Feedback error:", err);
+    setFeedbackSent(false);
   }
+}
 
   const laughEmojis = ["😂", "😂", "🤣", "😂", "🤣", "😂", "🤣", "😂"];
   const tomatoEmojis = ["🍅", "💥", "🍅", "💥", "🍅", "🍅", "💥", "🍅"];

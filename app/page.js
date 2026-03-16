@@ -63,7 +63,7 @@ export default function Home() {
     if (step === "result") {
       timer = setTimeout(() => {
         resetKiosk();
-      }, 7000);
+      }, 15000);
     }
 
     return () => clearTimeout(timer);

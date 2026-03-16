@@ -29,7 +29,15 @@ export async function POST(req) {
       );
     }
 
-   const prompt = `
+    if (!process.env.OPENAI_API_KEY) {
+      console.error("Missing OPENAI_API_KEY");
+      return Response.json(
+        { error: "Missing OPENAI_API_KEY" },
+        { status: 500 }
+      );
+    }
+
+    const prompt = `
 You are a brutal stand-up comedian doing crowd work in a late night comedy club.
 
 Roast the person using their first name and the provided detail.
@@ -39,7 +47,6 @@ First name: ${firstName}
 Detail: ${detail || "No detail given"}
 
 Rules:
-
 - 1 sentence only
 - Max 18 words
 - Be mean, punchy, and funny
@@ -47,8 +54,10 @@ Rules:
 - Roast them like a live comedian would
 - Use the detail if possible
 - Avoid generic AI phrasing
-
-Now write the roast.
+- No introductions
+- No explanations
+- No hashtags
+- No protected class insults
 `;
 
     const response = await openai.responses.create({
@@ -61,23 +70,40 @@ Now write the roast.
       `${firstName} somehow gave us less than nothing.`;
 
     if (process.env.GOOGLE_SHEETS_WEBHOOK_URL) {
-      await fetch(process.env.GOOGLE_SHEETS_WEBHOOK_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-          detail,
-          roast
-        })
-      });
+      try {
+        const sheetRes = await fetch(process.env.GOOGLE_SHEETS_WEBHOOK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            firstName,
+            lastName,
+            email,
+            detail,
+            roast,
+            feedback: ""
+          })
+        });
+
+        const sheetText = await sheetRes.text();
+        console.log("Google Sheets response:", sheetRes.status, sheetText);
+      } catch (sheetError) {
+        console.error("Google Sheets error:", sheetError);
+      }
+    } else {
+      console.warn("Missing GOOGLE_SHEETS_WEBHOOK_URL");
     }
 
-    return Response.json({ roast });
-
+    return Response.json({
+      roast,
+      submission: {
+        firstName,
+        lastName,
+        email,
+        detail
+      }
+    });
   } catch (error) {
     console.error("ROAST API ERROR:", error);
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function Home() {
   const [step, setStep] = useState("start");
@@ -16,6 +16,11 @@ export default function Home() {
   const [error, setError] = useState("");
   const [loadingText, setLoadingText] = useState("");
 
+  const [lastSubmission, setLastSubmission] = useState(null);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [reactionType, setReactionType] = useState("");
+  const [showReaction, setShowReaction] = useState(false);
+
   const loadingMessages = [
     "SCANNING FOR WEAKNESSES...",
     "CONSULTING THE ARCADE OF SHAME...",
@@ -23,6 +28,14 @@ export default function Home() {
     "GENERATING PUBLIC HUMILIATION...",
     "TARGET LOCKED..."
   ];
+
+  const cabinetGlow = useMemo(() => {
+    return `
+      0 0 20px rgba(255,0,128,.25),
+      0 0 50px rgba(0,255,255,.12),
+      inset 0 0 25px rgba(255,255,255,.04)
+    `;
+  }, []);
 
   function resetKiosk() {
     setFirstName("");
@@ -33,6 +46,10 @@ export default function Home() {
     setDisplayedRoast("");
     setError("");
     setLoadingText("");
+    setLastSubmission(null);
+    setFeedbackSent(false);
+    setReactionType("");
+    setShowReaction(false);
     setStep("start");
   }
 
@@ -46,7 +63,7 @@ export default function Home() {
     if (step === "result") {
       timer = setTimeout(() => {
         resetKiosk();
-      }, 10000);
+      }, 7000);
     }
 
     return () => clearTimeout(timer);
@@ -77,13 +94,16 @@ export default function Home() {
       if (index >= roast.length) {
         clearInterval(interval);
       }
-    }, 35);
+    }, 28);
 
     return () => clearInterval(interval);
   }, [step, roast]);
 
   async function getRoast() {
     setError("");
+    setFeedbackSent(false);
+    setReactionType("");
+    setShowReaction(false);
 
     if (!firstName.trim() || !lastName.trim() || !email.trim()) {
       setError("ENTER FIRST NAME, LAST NAME, AND EMAIL.");
@@ -123,14 +143,55 @@ export default function Home() {
 
       setTimeout(() => {
         setRoast(data.roast);
+        setLastSubmission(data.submission);
         setStep("result");
       }, 1400);
-
     } catch (err) {
       setError("SYSTEM ERROR. TRY AGAIN.");
       setStep("form");
     }
   }
+
+  async function sendFeedback(feedback) {
+    if (feedbackSent || !lastSubmission) return;
+
+    setFeedbackSent(true);
+    setReactionType(feedback);
+    setShowReaction(true);
+
+    setTimeout(() => {
+      setShowReaction(false);
+    }, 1400);
+
+    const feedbackWebhook = process.env.NEXT_PUBLIC_FEEDBACK_WEBHOOK_URL;
+
+    if (!feedbackWebhook) {
+      console.warn("Missing NEXT_PUBLIC_FEEDBACK_WEBHOOK_URL");
+      return;
+    }
+
+    try {
+      await fetch(feedbackWebhook, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          firstName: lastSubmission.firstName,
+          lastName: lastSubmission.lastName,
+          email: lastSubmission.email,
+          detail: lastSubmission.detail,
+          roast,
+          feedback
+        })
+      });
+    } catch (err) {
+      console.error("Feedback error:", err);
+    }
+  }
+
+  const laughEmojis = ["😂", "😂", "🤣", "😂", "🤣", "😂", "🤣", "😂"];
+  const tomatoEmojis = ["🍅", "💥", "🍅", "💥", "🍅", "🍅", "💥", "🍅"];
 
   const styles = {
     main: {
@@ -177,11 +238,7 @@ export default function Home() {
       borderRadius: "28px",
       border: "4px solid rgba(255,255,255,.12)",
       background: "linear-gradient(180deg, rgba(20,15,35,.94), rgba(10,8,20,.96))",
-      boxShadow: `
-        0 0 20px rgba(255,0,128,.25),
-        0 0 50px rgba(0,255,255,.12),
-        inset 0 0 25px rgba(255,255,255,.04)
-      `,
+      boxShadow: cabinetGlow,
       padding: "30px 28px",
       display: "flex",
       alignItems: "center",
@@ -314,6 +371,10 @@ export default function Home() {
       boxSizing: "border-box"
     },
 
+    roastWrap: {
+      position: "relative"
+    },
+
     roast: {
       fontSize: "clamp(28px, 4vw, 44px)",
       lineHeight: 1.35,
@@ -332,7 +393,65 @@ export default function Home() {
       marginTop: "8px",
       fontSize: "15px",
       letterSpacing: "1px"
-    }
+    },
+
+    feedbackRow: {
+      display: "flex",
+      justifyContent: "center",
+      gap: "18px",
+      marginTop: "24px"
+    },
+
+    feedbackButton: {
+      fontSize: "28px",
+      fontWeight: "900",
+      padding: "14px 22px",
+      borderRadius: "14px",
+      border: "2px solid rgba(255,255,255,.18)",
+      background: "rgba(0,0,0,.35)",
+      color: "#fff",
+      cursor: "pointer",
+      minWidth: "140px"
+    },
+
+    feedbackNote: {
+      marginTop: "14px",
+      fontSize: "14px",
+      color: "#d6c9ff",
+      letterSpacing: "1px"
+    },
+
+    laughBurst: {
+      position: "absolute",
+      inset: 0,
+      pointerEvents: "none"
+    },
+
+    booBurst: {
+      position: "absolute",
+      inset: 0,
+      pointerEvents: "none"
+    },
+
+    emojiParticle: (left, delay, size) => ({
+      position: "absolute",
+      left: `${left}%`,
+      bottom: "5%",
+      fontSize: `${size}px`,
+      animation: `emojiRise 1.2s ease-out ${delay}s forwards`
+    }),
+
+    tomatoParticle: (left, top, delay, size) => ({
+      position: "absolute",
+      left: `${left}%`,
+      top: `${top}%`,
+      fontSize: `${size}px`,
+      animation: `tomatoBlast 0.9s ease-out ${delay}s forwards`
+    }),
+
+    shakeScreen: reactionType === "boo" && showReaction
+      ? { animation: "screenShake 0.45s ease-in-out 2" }
+      : {}
   };
 
   return (
@@ -412,6 +531,43 @@ export default function Home() {
             filter: hue-rotate(180deg);
           }
         }
+
+        @keyframes emojiRise {
+          0% {
+            transform: translateY(0) scale(.8) rotate(0deg);
+            opacity: 0;
+          }
+          15% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-220px) scale(1.2) rotate(16deg);
+            opacity: 0;
+          }
+        }
+
+        @keyframes tomatoBlast {
+          0% {
+            transform: scale(.4) rotate(0deg);
+            opacity: 0;
+          }
+          20% {
+            opacity: 1;
+          }
+          100% {
+            transform: scale(1.6) rotate(20deg);
+            opacity: 0;
+          }
+        }
+
+        @keyframes screenShake {
+          0% { transform: translateX(0); }
+          20% { transform: translateX(-8px); }
+          40% { transform: translateX(8px); }
+          60% { transform: translateX(-6px); }
+          80% { transform: translateX(6px); }
+          100% { transform: translateX(0); }
+        }
       `}</style>
 
       <div style={styles.scanlines}></div>
@@ -423,7 +579,7 @@ export default function Home() {
           <div style={styles.crtFlicker}></div>
           <div style={styles.bezelGlowRing}></div>
 
-          <div style={styles.screen}>
+          <div style={{ ...styles.screen, ...styles.shakeScreen }}>
             {step === "start" && (
               <div>
                 <div style={styles.title}>
@@ -476,7 +632,7 @@ export default function Home() {
                 />
 
                 <input
-                  placeholder="Tell me about yourself."
+                  placeholder="JOB / HOMETOWN / BAD HABIT"
                   value={detail}
                   onChange={(e) => setDetail(e.target.value)}
                   style={styles.input}
@@ -498,9 +654,68 @@ export default function Home() {
             )}
 
             {step === "result" && (
-              <div style={styles.roast}>
-                {displayedRoast}
-                <span>|</span>
+              <div style={styles.roastWrap}>
+                <div style={styles.roast}>
+                  {displayedRoast}
+                  <span>|</span>
+                </div>
+
+                <div style={styles.feedbackRow}>
+                  <button
+                    onClick={() => sendFeedback("lol")}
+                    disabled={feedbackSent}
+                    style={styles.feedbackButton}
+                  >
+                    😂 LOL
+                  </button>
+
+                  <button
+                    onClick={() => sendFeedback("boo")}
+                    disabled={feedbackSent}
+                    style={styles.feedbackButton}
+                  >
+                    🍅 BOO
+                  </button>
+                </div>
+
+                <div style={styles.feedbackNote}>
+                  {feedbackSent ? "FEEDBACK LOCKED IN." : "RATE THE DAMAGE."}
+                </div>
+
+                {showReaction && reactionType === "lol" && (
+                  <div style={styles.laughBurst}>
+                    {laughEmojis.map((emoji, index) => (
+                      <div
+                        key={`lol-${index}`}
+                        style={styles.emojiParticle(
+                          10 + index * 11,
+                          index * 0.04,
+                          34 + (index % 3) * 8
+                        )}
+                      >
+                        {emoji}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {showReaction && reactionType === "boo" && (
+                  <div style={styles.booBurst}>
+                    {tomatoEmojis.map((emoji, index) => (
+                      <div
+                        key={`boo-${index}`}
+                        style={styles.tomatoParticle(
+                          12 + index * 10,
+                          22 + (index % 3) * 14,
+                          index * 0.03,
+                          34 + (index % 2) * 10
+                        )}
+                      >
+                        {emoji}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
